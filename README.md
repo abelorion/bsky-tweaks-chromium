@@ -4,7 +4,7 @@ A short chrome extension for bluesky to add and tweak a few features
 # Features
 1 - Mutuals badge so you can spot them a mile off
 
-2 - An inbuilt interface to help you type emojis
+2 - An inbuilt shortcodes option to help you type emojis
 
 3 - gif saver feature
 
