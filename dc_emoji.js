@@ -238,11 +238,21 @@
   }
 
   function updateSuggestions(editable) {
+    //V1.0.1
+    //Hide suggestions in chat messages which have this fweature even tho the rest of the website doesn't
+    if (location.pathname.startsWith("/messages")) {
+      hideSuggestions();
+      return;
+    }
+
+
     const context = getActiveShortcodeContext(editable);
     if (!context) {
       hideSuggestions();
       return;
     }
+
+
 
     const normalizedQuery = normalizeShortcode(context.query);
 
