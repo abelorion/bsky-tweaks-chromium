@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Bsky Tweaks :3",
+  "version": "3.0",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://bsky.app/*"],
+      "js": ["mutual_badge.js","dc_emoji.js", "gif_saving.js"],
+      "css": ["style.css"]
+    }
+  ],
+  "host_permissions": ["https://public.api.bsky.app/*"],
+  "web_accessible_resources": [
+    {
+      "resources": ["joypixels_shortcodes.json"],
+      "matches": ["https://bsky.app/*"]
+    }
+  ]
+}
