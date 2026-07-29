@@ -1,12 +1,18 @@
 {
   "manifest_version": 3,
   "name": "Bsky Tweaks :3",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "permissions": ["storage"],
+  "action":{
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
     {
       "matches": ["https://bsky.app/*"],
-      "js": ["mutual_badge.js","dc_emoji.js", "gif_saving.js"],
+      "js": ["mutual_badge.js", "dc_emoji.js", "gif_saving.js",
+      "feature_sync.js", "hide_followers.js"
+    
+    ],
       "css": ["style.css"]
     }
   ],

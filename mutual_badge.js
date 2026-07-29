@@ -4,12 +4,24 @@ let isSyncing = false;
 const CACHE_KEY = "bsky_mutuals_cache";
 const CACHE_MAX_AGE = 1000 * 60 * 60 * 6; // 6 hours
 
-// 1. Status UI (Forced visibility)
+// 1. Status UI
 const statusEl = document.createElement('div');
 statusEl.id = 'bsky-mutuals-status';
 statusEl.style = "position:fixed; top:15px; right:15px; z-index:99999; background:#000; color:#fff; padding:6px 12px; border-radius:30px; font-size:11px; font-weight:bold; font-family:sans-serif; display:flex; align-items:center; gap:8px; border:1px solid #333; box-shadow: 0 4px 12px rgba(0,0,0,0.5);";
 statusEl.innerHTML = '<div id="status-dot" style="width:10px; height:10px; border-radius:50%; background:#777;"></div><span id="status-text">Locating Profile...</span>';
 document.body.appendChild(statusEl);
+
+let hideFollowerCounts = false;
+let hideBadges = false;
+
+// Initial Settings Read
+chrome.storage.sync.get({ hideFollowers: false, hideMoots: false }, (res) => {
+    hideFollowerCounts = res.hideFollowers;
+    hideBadges = res.hideMoots;
+    if (!hideBadges) {
+        syncMutuals();
+    }
+});
 
 function updateStatus(text, color) {
     const dot = document.getElementById('status-dot');
@@ -31,7 +43,11 @@ async function loadCachedMutuals(myHandle) {
                 Date.now() - cache.updated < CACHE_MAX_AGE
             ) {
                 mutualHandles = new Set(cache.mutuals);
-                updateStatus(`${mutualHandles.size} Cached Mutuals`, "#00ccff");
+                if (hideFollowerCounts) {
+                    updateStatus(`Cached Mutuals`, "#00ccff");
+                } else {
+                    updateStatus(`${mutualHandles.size} Cached Mutuals`, "#00ccff");
+                }
                 inject();
             }
 
@@ -54,15 +70,24 @@ async function saveCachedMutuals(myHandle) {
 
 // 2. Data Fetching
 async function syncMutuals() {
+    if (hideBadges) return;
     if (isSyncing) return;
+
     const profileLink = document.querySelector('nav a[href^="/profile/"]');
-    if (!profileLink) { setTimeout(syncMutuals, 1000); return; }
+    if (!profileLink) { 
+        setTimeout(syncMutuals, 1000); 
+        return; 
+    }
 
     isSyncing = true;
     const myHandle = profileLink.getAttribute('href').split('/')[2].toLowerCase();
     
     await loadCachedMutuals(myHandle);
-    updateStatus(`Refreshing moots list...`, "#ffcc00");
+    
+    // If cache already hydrated mutualHandles, we don't force immediate API re-fetch unless cache missing
+    if (mutualHandles.size === 0) {
+        updateStatus(`Refreshing moots list...`, "#ffcc00");
+    }
 
     try {
         const fetchAll = async (endpoint) => {
@@ -78,6 +103,8 @@ async function syncMutuals() {
                 const users = endpoint.includes("Followers")
                     ? data.followers
                     : data.follows;
+
+                if (!users) break;
 
                 users.forEach(u => list.add(u.handle.toLowerCase()));
 
@@ -95,7 +122,12 @@ async function syncMutuals() {
         
         mutualHandles = new Set([...ing].filter(h => ers.has(h)));
         await saveCachedMutuals(myHandle);
-        updateStatus(`${mutualHandles.size} Mutuals Updated`, "#00ff00");
+
+        if (hideFollowerCounts) {
+            updateStatus(`Mutuals Updated`, "#00ff00");
+        } else {
+            updateStatus(`${mutualHandles.size} Mutuals Updated`, "#00ff00");
+        }
         inject();
     } catch (e) { 
         updateStatus("Sync Error", "#ff4444"); 
@@ -103,16 +135,21 @@ async function syncMutuals() {
     isSyncing = false;
 }
 
-function handleMutualsUpdate() {
-    if (mutualHandles.size === 0) return;
+function removeAllBadges() {
+    document.querySelectorAll(".mutual-badge").forEach(el => el.remove());
+    document.querySelectorAll('[data-has-mutual-badge="true"]').forEach(post => {
+        delete post.dataset.hasMutualBadge;
+    });
+}
 
-    // Target the main post containers
+function handleMutualsUpdate() {
+    if (hideBadges || mutualHandles.size === 0) return;
+
     const posts = document.querySelectorAll('[data-testid^="postThreadItem"], [data-testid^="feedItem"]');
 
     posts.forEach(post => {
         if (post.dataset.hasMutualBadge) return;
 
-        // Find profile links within this post
         const links = post.querySelectorAll('a[href^="/profile/"]');
         
         for (const link of links) {
@@ -120,20 +157,16 @@ function handleMutualsUpdate() {
             const handle = urlParts[2]?.toLowerCase();
 
             if (handle && mutualHandles.has(handle)) {
-                // Filter: Only trigger on the main author (ignore avatars/timestamps)
+                // Filter: Only trigger on main author (ignore avatars, timestamps, handles)
                 if (link.querySelector('img') || link.innerText.includes('·') || link.innerText.trim().startsWith('@')) {
                     continue;
                 }
 
-                // Create the badge using only the class
                 const badge = document.createElement('span');
                 badge.className = 'mutual-badge';
                 badge.innerText = '♡';
                 
-                // Append to the POST container so CSS 'absolute' positioning works
                 post.appendChild(badge);
-                
-                // Lock the post
                 post.dataset.hasMutualBadge = "true";
                 break; 
             }
@@ -141,21 +174,50 @@ function handleMutualsUpdate() {
     });
 }
 
+// Handle Real-Time Popup Toggles
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "sync") return;
+
+    if (changes.hideFollowers) {
+        hideFollowerCounts = changes.hideFollowers.newValue;
+        if (!hideBadges && mutualHandles.size > 0) {
+            updateStatus(hideFollowerCounts ? `Mutuals Updated` : `${mutualHandles.size} Mutuals Updated`, "#00ff00");
+        }
+    }
+
+    if (changes.hideMoots) {
+        hideBadges = changes.hideMoots.newValue;
+          
+        if (hideBadges) {
+            removeAllBadges();
+            updateStatus("Badges Hidden", "#777");
+        } else {
+            // Re-enable: clear lock dataset, sync data if empty, and re-inject
+            removeAllBadges();
+            syncMutuals();
+            inject();
+        }
+    }
+});
+
 function inject() {
-    handleMutualsUpdate();
+    if (!hideBadges) {
+        handleMutualsUpdate();
+    }
 }
 
-// Start & Background refresh
-syncMutuals();
+// Background refresh every 6 hours
 setInterval(() => {
     syncMutuals();
-}, 1000 * 60 * 60 * 6); // every 6 hours
+}, 1000 * 60 * 60 * 6);
 
-if (window.bskyInterval) clearInterval(window.bskyInterval);
-
+// Observer for React dynamic rendering
 const observer = new MutationObserver(() => {
     window.requestAnimationFrame(inject);
 });
-observer.observe(document.body, { childList: true, subtree: true });
-inject(); // Run once immediately
-setInterval(inject, 2000);
+
+if (document.body) {
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
+inject();
