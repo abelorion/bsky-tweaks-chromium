@@ -6,7 +6,9 @@ A short chrome extension for bluesky to add and tweak a few features
 
 2 - An inbuilt shortcodes option to help you type emojis
 
-3 - gif saver feature
+3 - gif saving feature
+
+4 - Follower count hiding 
 
 # Planned
 Quick-Access Media Gallery
