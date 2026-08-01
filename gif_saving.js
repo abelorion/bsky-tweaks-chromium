@@ -1,17 +1,42 @@
+// @grant        GM_getValue
+// @grant        GM_setValue
+
 (function () {
   'use strict';
 
   function getStorageSavedGifs() {
     try {
-      const data = localStorage.getItem('dcSavedGifs');
-      return data ? JSON.parse(data) : [];
+      // 1. Prioritize secure Userscript storage
+      if (typeof GM_getValue !== 'undefined') {
+        const gmData = GM_getValue('dcSavedGifs');
+        if (gmData) return JSON.parse(gmData);
+      }
+      // 2. Fallback to localStorage (and migrate old data if it exists)
+      const localData = localStorage.getItem('dcSavedGifs');
+      if (localData) {
+        if (typeof GM_setValue !== 'undefined') {
+            GM_setValue('dcSavedGifs', localData); // Migrate to permanent storage
+        }
+        return JSON.parse(localData);
+      }
+      return [];
     } catch (e) {
+      console.error('Klipy: Error reading saved GIFs', e);
       return [];
     }
   }
 
   function setStorageSavedGifs(gifs) {
-    localStorage.setItem('dcSavedGifs', JSON.stringify(gifs));
+    const stringified = JSON.stringify(gifs);
+    try {
+      if (typeof GM_setValue !== 'undefined') {
+        GM_setValue('dcSavedGifs', stringified);
+      }
+      // Keep localStorage updated as a fallback/mirror
+      localStorage.setItem('dcSavedGifs', stringified);
+    } catch (e) {
+      console.error('Klipy: Error saving GIFs', e);
+    }
   }
 
   const ICONS = {
@@ -280,7 +305,6 @@
       handleTabSwitch(savedBtn);
       applySavedGridView();
       
-      // Secondary check to override any race conditions when another tab was loading
       setTimeout(() => {
         if (activeTabState === 'saved') {
           applySavedGridView();
