@@ -6,7 +6,7 @@ A short chrome extension for bluesky to add and tweak a few features
 
 2 - An inbuilt shortcodes option to help you type emojis
 
-3 - gif saving feature
+3 - Gif saving feature
 
 4 - Follower count hiding 
 
@@ -16,6 +16,8 @@ Quick-Access Media Gallery
 Time outs for people who wanna take breaks from scrolling
 
 Custom Downloader button for images/videos/gifs
+
+Support for custom emoji codee~ tbc?
 
 Thread Unroller & Reader
 
